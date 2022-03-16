@@ -37,23 +37,20 @@ defimpl Scrivener.Paginater, for: Ecto.Query do
 
   defp entries(query, repo, page_number, _, page_size, caller, options) do
     offset = Keyword.get_lazy(options, :offset, fn -> page_size * (page_number - 1) end)
-    prefix = options[:prefix]
 
     query
     |> offset(^offset)
     |> limit(^page_size)
-    |> all(repo, caller, prefix)
+    |> all(repo, caller, options)
   end
 
   defp total_entries(query, repo, caller, options) do
-    prefix = options[:prefix]
-
     total_entries =
       query
       |> exclude(:preload)
       |> exclude(:order_by)
       |> aggregate()
-      |> one(repo, caller, prefix)
+      |> one(repo, caller, options)
 
     total_entries || 0
   end
@@ -100,19 +97,23 @@ defimpl Scrivener.Paginater, for: Ecto.Query do
     (total_entries / page_size) |> Float.ceil() |> round
   end
 
-  defp all(query, repo, caller, nil) do
-    repo.all(query, caller: caller)
+  defp all(query, repo, caller, options) do
+    options = compose_options(caller, options) |> IO.inspect(label: " fistro SCRIVENER ALL")
+    repo.all(query, options)
   end
 
-  defp all(query, repo, caller, prefix) do
-    repo.all(query, caller: caller, prefix: prefix)
-  end
-
-  defp one(query, repo, caller, nil) do
+  defp one(query, repo, caller, options) do
+    options = compose_options(caller, options) |> IO.inspect(label: " fistro SCRIVENER ONE")
     repo.one(query, caller: caller)
   end
 
   defp one(query, repo, caller, prefix) do
     repo.one(query, caller: caller, prefix: prefix)
+  end
+
+  defp compose_options(caller, options) do
+    Enum.reduce(options, [caller: caller], fn {key, value}, opts ->
+      if key in [:prefix, :prepare], do: Keyword.put(opts, key, value), else: opts
+    end)
   end
 end
